@@ -60,7 +60,6 @@ resource "google_container_node_pool" "node_pool" {
     }
 
     tags = [
-      module.vpc_network.public,
       "helm-example",
     ]
 
@@ -103,29 +102,6 @@ resource "null_resource" "configure_kubectl" {
   }
 
   depends_on = [google_container_node_pool.node_pool]
-}
-
-resource "kubernetes_cluster_role_binding" "user" {
-  metadata {
-    name = "admin-user"
-  }
-
-  role_ref {
-    kind      = "ClusterRole"
-    name      = "cluster-admin"
-    api_group = "rbac.authorization.k8s.io"
-  }
-
-  subject {
-    kind      = "User"
-    api_group = "rbac.authorization.k8s.io"
-  }
-
-  subject {
-    kind      = "Group"
-    name      = "system:masters"
-    api_group = "rbac.authorization.k8s.io"
-  }
 }
 
 resource "helm_release" "nginx" {
