@@ -1,6 +1,6 @@
 module "gke" {
   source                     = "terraform-google-modules/kubernetes-engine/google"
-  version                    = "16.0.1"
+  version                    = "v1.24"
   project_id                 = var.project_id
   region                     = var.region
   zones                      = var.zones
