@@ -30,56 +30,13 @@ module "gke" {
       initial_node_count = var.initial_node_count
     },
   ]
-
-  node_pools_oauth_scopes = {
-    all = []
-
-    default-node-pool = [
-      "https://www.googleapis.com/auth/cloud-platform",
-    ]
-  }
-
-  node_pools_labels = {
-    all = {}
-
-    default-node-pool = {
-      default-node-pool = true
-    }
-  }
-
-  node_pools_metadata = {
-    all = {}
-
-    default-node-pool = {
-      node-pool-metadata-custom-value = "my-node-pool"
-    }
-  }
-
-  node_pools_taints = {
-    all = []
-
-    default-node-pool = [
-      {
-        key    = "default-node-pool"
-        value  = true
-        effect = "PREFER_NO_SCHEDULE"
-      },
-    ]
-  }
-
-  node_pools_tags = {
-    all = []
-
-    default-node-pool = [
-      "default-node-pool",
-    ]
-  }
 }
+ 
 resource "google_container_node_pool" "node_pool" {
   provider = google-beta
 
   name     = "main-pool"
-  project  = var.project
+  project  = var.project_id
   location = var.location
   
   initial_node_count = "1"
@@ -131,7 +88,7 @@ resource "google_container_node_pool" "node_pool" {
 
 module "gke_service_account" {
   name        = var.service_account
-  project     = var.project
+  project     = var.project_id
   description = "this is for service account"
 }
 
@@ -142,19 +99,16 @@ resource "random_string" "suffix" {
 }
 
 module "vpc_network" {
-  name_prefix = var.vpc_name
-  project     = var.project
+  name_prefix = "vpc-gke"
+  project     = var.project_id
   region      = var.region
 
-  cidr_block           = var.vpc_cidr_block
-  secondary_cidr_block = var.vpc_secondary_cidr_block
-
-  public_subnetwork_secondary_range_name = var.public_subnetwork_secondary_range_name
-  public_services_secondary_range_name   = var.public_services_secondary_range_name
-  public_services_secondary_cidr_block   = var.public_services_secondary_cidr_block
-  private_services_secondary_cidr_block  = var.private_services_secondary_cidr_block
-  secondary_cidr_subnetwork_width_delta  = var.secondary_cidr_subnetwork_width_delta
-  secondary_cidr_subnetwork_spacing      = var.secondary_cidr_subnetwork_spacing
+  cidr_block           = "10.3.0.0/16"
+  secondary_cidr_block = "10.4.0.0/16"
+}
+ 
+  secondary_cidr_subnetwork_width_delta  = "4"
+  secondary_cidr_subnetwork_spacing      = "0"
 }
 
 resource "null_resource" "configure_kubectl" {
@@ -182,7 +136,7 @@ resource "kubernetes_cluster_role_binding" "user" {
 
   subject {
     kind      = "User"
-    name      = data.google_client_openid_userinfo.terraform_user.email
+    name      = data.google_client_openid_userinfo.psk24091988@gmail.com
     api_group = "rbac.authorization.k8s.io"
   }
 
