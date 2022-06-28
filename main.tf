@@ -95,7 +95,7 @@ resource "random_string" "suffix" {
 
 resource "null_resource" "configure_kubectl" {
   provisioner "local-exec" {
-    command = "gcloud beta container clusters get-credentials ${module.gke_cluster.name} --region ${var.region} --project ${var.project}"
+    command = "gcloud beta container clusters get-credentials ${var.name} --region ${var.region} --project ${var.project_id}"
 
     environment = {
       KUBECONFIG = var.kubectl_config_path != "" ? var.kubectl_config_path : ""
