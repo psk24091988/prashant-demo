@@ -40,7 +40,7 @@ module "gke" {
   }
 
   node_pools_labels = {
-    all = {}
+    all = []
 
     default-node-pool = {
       default-node-pool = true
@@ -48,7 +48,7 @@ module "gke" {
   }
 
   node_pools_metadata = {
-    all = {}
+    all = []
 
     default-node-pool = {
       node-pool-metadata-custom-value = "my-node-pool"
