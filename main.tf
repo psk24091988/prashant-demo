@@ -34,6 +34,7 @@ module "gke" {
  
 resource "google_container_node_pool" "node_pool" {
   provider = google-beta
+  cluster = var.name
 
   name     = "main-pool"
   project  = var.project_id
