@@ -16,7 +16,7 @@ module "gke" {
 
   node_pools = [
     {
-      name               = "default-node-pool"
+      name               = var.name
       machine_type       = var.machine_type
       min_count          = var.min_count
       max_count          = var.max_count
