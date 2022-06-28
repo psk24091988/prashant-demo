@@ -104,9 +104,7 @@ module "vpc_network" {
   region      = var.region
 
   cidr_block           = "10.3.0.0/16"
-  secondary_cidr_block = "10.4.0.0/16"
-}
- 
+  secondary_cidr_block = "10.4.0.0/16" 
   secondary_cidr_subnetwork_width_delta  = "4"
   secondary_cidr_subnetwork_spacing      = "0"
 }
@@ -136,7 +134,6 @@ resource "kubernetes_cluster_role_binding" "user" {
 
   subject {
     kind      = "User"
-    name      = data.google_client_openid_userinfo.psk24091988@gmail.com
     api_group = "rbac.authorization.k8s.io"
   }
 
