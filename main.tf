@@ -37,7 +37,7 @@ resource "google_container_node_pool" "node_pool" {
 
   name     = "main-pool"
   project  = var.project_id
-  location = var.location
+  location = var.region
   
   initial_node_count = "1"
 
