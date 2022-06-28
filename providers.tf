@@ -8,10 +8,7 @@ terraform {
   backend "gcs" {
     bucket = "prashant-terra-buck"
     prefix = "terraform/tfstat"
-    versoning { 
-      enabled = true
     }
-  }
 }
 
 provider "google-beta" {
