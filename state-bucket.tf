@@ -6,6 +6,5 @@ resource "google_storage_bucket" "prashant-terra-buck"  {
   storage_class = "STANDARD"
   versioning {
    enabled = true
-   lock = true
   }
 }
