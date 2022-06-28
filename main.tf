@@ -86,28 +86,12 @@ resource "google_container_node_pool" "node_pool" {
   }
 }
 
-module "gke_service_account" {
-  name        = var.service_account
-  project     = var.project_id
-  description = "this is for service account"
-}
-
 resource "random_string" "suffix" {
   length  = 4
   special = false
   upper   = false
 }
 
-module "vpc_network" {
-  name_prefix = "vpc-gke"
-  project     = var.project_id
-  region      = var.region
-
-  cidr_block           = "10.3.0.0/16"
-  secondary_cidr_block = "10.4.0.0/16" 
-  secondary_cidr_subnetwork_width_delta  = "4"
-  secondary_cidr_subnetwork_spacing      = "0"
-}
 
 resource "null_resource" "configure_kubectl" {
   provisioner "local-exec" {
