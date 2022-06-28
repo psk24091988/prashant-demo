@@ -4,13 +4,6 @@ provider "google" {
   region  = var.region
   }
 
-terraform {
-  backend "gcs" {
-    bucket = "prashant-terra-buck"
-    prefix = "terraform/tfstat"
-    }
-}
-
 provider "google-beta" {
     credentials = var.creds
   project     = var.project_id
