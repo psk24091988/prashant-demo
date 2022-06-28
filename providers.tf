@@ -7,7 +7,8 @@ provider "google" {
 terraform {
   backend "gcs" {
     bucket = "prashant-terra-buck"
-    prefix = "terraform/state"
+    prefix = "terraform/tfstat"
+    force_destroy = false    
   }
 }
 
