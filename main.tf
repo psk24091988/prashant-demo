@@ -98,7 +98,7 @@ resource "null_resource" "configure_kubectl" {
     command = "gcloud beta container clusters get-credentials ${var.name} --region ${var.region} --project ${var.project_id}"
 
     environment = {
-      KUBECONFIG = var.kubectl_config_path != "" ? var.kubectl_config_path : ""
+      KUBECONFIG = "$HOME/.kube/config"
     }
   }
 
