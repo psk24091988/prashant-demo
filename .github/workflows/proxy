@@ -1,0 +1,11 @@
+📦 squid-proxy-moderation
+├── 📄 Dockerfile
+├── 📄 squid.conf
+├── 📄 moderation_engine.py
+├── 📄 deploy.sh
+├── 📂 configs
+│   ├── 📄 terms.yaml
+│   └── 📄 exceptions.yaml
+└── 📂 scripts
+    ├── 📄 auto-updater.py
+    └── 📄 emergency-toggle.py
