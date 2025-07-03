@@ -9,3 +9,428 @@
 └── 📂 scripts
     ├── 📄 auto-updater.py
     └── 📄 emergency-toggle.py
+
+# scripts/emergency-toggle.py
+import os
+import requests
+from google.cloud import secretmanager
+
+def toggle_moderation(enable=True):
+    client = secretmanager.SecretManagerServiceClient()
+    name = f"projects/{os.getenv('PROJECT_ID')}/secrets/moderation-toggle/versions/latest"
+    
+    # Update the secret
+    payload = "ENABLED" if enable else "DISABLED"
+    client.add_secret_version(
+        parent=f"projects/{os.getenv('PROJECT_ID')}/secrets/moderation-toggle",
+        payload={"data": payload.encode('UTF-8')}
+    )
+    
+    # Broadcast to all instances
+    service_url = os.getenv('SERVICE_URL')
+    if service_url:
+        requests.post(f"{service_url}/flush-config", timeout=5)
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--disable", action="store_true")
+    args = parser.parse_args()
+    
+    toggle_moderation(not args.disable)
+    print(f"Moderation {'disabled' if args.disable else 'enabled'}")
+
+_-------------------------------------------------------
+
+#!/bin/bash
+# deploy.sh - Production deployment script
+
+# Validate environment
+PROJECT_ID=$(gcloud config get-value project)
+if [ -z "$PROJECT_ID" ]; then
+    echo "ERROR: No GCP project configured"
+    exit 1
+fi
+
+# Build with security scanning
+echo "🛠️ Building container with Cloud Build..."
+gcloud builds submit --tag gcr.io/$PROJECT_ID/squid-proxy-moderation \
+    --substitutions _SCAN_TYPE="vulnerability" \
+    --timeout 3600
+
+# Create configuration bucket
+CONFIG_BUCKET="gs://${PROJECT_ID}-moderation-configs"
+if ! gsutil ls $CONFIG_BUCKET &> /dev/null; then
+    echo "📦 Creating configuration bucket..."
+    gsutil mb -l us-central1 $CONFIG_BUCKET
+    gsutil cp ./configs/terms.yaml $CONFIG_BUCKET/
+    gsutil iam ch serviceAccount:${PROJECT_ID}@appspot.gserviceaccount.com:objectViewer $CONFIG_BUCKET
+fi
+
+# Deploy to Cloud Run
+echo "🚀 Deploying to Cloud Run..."
+gcloud run deploy squid-proxy-moderation \
+    --image gcr.io/$PROJECT_ID/squid-proxy-moderation \
+    --platform managed \
+    --region us-central1 \
+    --cpu 8 \
+    --memory 16Gi \
+    --min-instances 1 \
+    --max-instances 10 \
+    --concurrency 100 \
+    --timeout 300 \
+    --set-env-vars "CONFIG_GS_BUCKET=${PROJECT_ID}-moderation-configs" \
+    --set-env-vars "MODEL_CACHE_DIR=/tmp/models" \
+    --set-env-vars "LOG_LEVEL=INFO" \
+    --add-cloudsql-instances ${PROJECT_ID}:us-central1:moderation-db \
+    --service-account moderation-sa@${PROJECT_ID}.iam.gserviceaccount.com \
+    --ingress internal-and-cloud-load-balancing \
+    --allow-unauthenticated
+
+echo "✅ Deployment complete!"
+echo "🔗 Proxy endpoint: $(gcloud run services describe squid-proxy-moderation --format='value(status.url)')"
+
+
+______________________________________________________
+
+# scripts/auto-updater.py
+import os
+import time
+import yaml
+import hashlib
+from google.cloud import storage
+
+class ConfigManager:
+    def __init__(self):
+        self.client = storage.Client()
+        self.bucket = os.getenv('CONFIG_GS_BUCKET')
+        self.local_dir = '/app/configs'
+        self.current_hashes = {}
+        
+    def sync_configs(self):
+        """Sync configs from GCS every 5 minutes"""
+        while True:
+            try:
+                blobs = self.client.list_blobs(self.bucket)
+                for blob in blobs:
+                    self._process_blob(blob)
+            except Exception as e:
+                print(f"Sync failed: {e}")
+            time.sleep(300)
+    
+    def _process_blob(self, blob):
+        """Download and validate config files"""
+        local_path = f"{self.local_dir}/{blob.name}"
+        remote_hash = hashlib.md5(blob.download_as_string()).hexdigest()
+        
+        if os.path.exists(local_path):
+            with open(local_path, 'rb') as f:
+                local_hash = hashlib.md5(f.read()).hexdigest()
+            if local_hash == remote_hash:
+                return
+        
+        # Download new config
+        blob.download_to_filename(local_path)
+        print(f"Updated config: {blob.name}")
+        
+        # Validate YAML
+        try:
+            with open(local_path, 'r') as f:
+                yaml.safe_load(f)
+            self.current_hashes[blob.name] = remote_hash
+        except Exception as e:
+            os.remove(local_path)
+            print(f"Invalid YAML in {blob.name}: {e}")
+
+if __name__ == "__main__":
+    manager = ConfigManager()
+    manager.sync_configs()
+
+-------------------------------------------------------+
+
+# Multi-stage build for security
+FROM python:3.9-slim as builder
+
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+# Runtime image
+FROM gcr.io/distroless/python3-debian11
+
+# Copy from builder
+COPY --from=builder /root/.local /root/.local
+COPY --chmod=755 --from=alpine:latest /bin/sh /bin/sh
+
+# Install runtime dependencies
+COPY --from=ubuntu:22.04 /usr/lib/x86_64-linux-gnu/squid/ /usr/lib/squid/
+COPY --from=ubuntu:22.04 /usr/sbin/squid /usr/sbin/squid
+
+# Application files
+WORKDIR /app
+COPY . .
+
+# Runtime configuration
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app
+ENV CONFIG_DIR=/app/configs
+ENV LOG_LEVEL=INFO
+
+# Health checks
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run
+USER nobody
+EXPOSE 3128 8000
+CMD ["sh", "-c", "squid -N & python /app/monitoring.py & python /app/moderation_engine.py"]
+
+
+---------++++++++++++++++++++----------------------------
+
+
+/squid-proxy-moderation
+│
+├── /configs
+│   ├── terms.yaml               # Main configuration
+│   ├── exceptions.yaml          # Whitelist rules
+│   └── regional_variations/     # Locale-specific rules
+│
+├── /scripts
+│   ├── auto-updater.py          # Config auto-updater
+│   └── emergency-toggle.py      # Kill switch
+│
+├── Dockerfile                   # Enhanced production Dockerfile
+├── squid.conf                   # Optimized Squid config
+├── moderation_engine.py         # AI moderation core
+└── deploy.sh                    # One-click deployment
+
+
+
+---------------+++++++++++++++---------------++++++++------
+
+
+content moderation script:-
+
+#!/usr/bin/python3
+import sys, yaml, re, time, os
+from datetime import datetime
+from urllib.parse import unquote, parse_qs
+import hashlib
+import json
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+class ModerationEngine:
+    def __init__(self):
+        self.config = None
+        self.last_loaded = 0
+        self.term_patterns = []
+        self.models = {}
+        self.load_config()
+        
+    def load_config(self):
+        try:
+            with open('/etc/config/terms.yaml', 'r') as f:
+                self.config = yaml.safe_load(f)
+                self._compile_patterns()
+                self._load_models()
+                self.last_loaded = time.time()
+                self._log("Configuration reloaded")
+        except Exception as e:
+            self._log(f"Config load failed: {str(e)}", level="ERROR")
+
+    def _compile_patterns(self):
+        self.term_patterns = []
+        for term_set in self.config.get('term_sets', []):
+            for term in term_set.get('terms', []):
+                try:
+                    pattern = re.compile(term['pattern'], re.IGNORECASE)
+                    self.term_patterns.append({
+                        'pattern': pattern,
+                        'weight': term.get('weight', 1.0),
+                        'category': term_set['id']
+                    })
+                except re.error as e:
+                    self._log(f"Invalid regex {term['pattern']}: {str(e)}", "WARNING")
+
+    def _load_models(self):
+        if 'model_settings' in self.config:
+            if 'llama_guard' in self.config['model_settings']:
+                self.models['llama'] = {
+                    'tokenizer': AutoTokenizer.from_pretrained("meta-llama/LlamaGuard-7b"),
+                    'model': AutoModelForSequenceClassification.from_pretrained("meta-llama/LlamaGuard-7b")
+                }
+
+    def _log(self, message, level="INFO"):
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": level,
+            "message": message
+        }
+        print(json.dumps(log_entry), file=sys.stderr)
+
+    def check_content(self, text, context=None):
+        # Check for config updates
+        if time.time() - self.last_loaded > self.config['settings']['refresh_interval']:
+            self.load_config()
+
+        # Initialize result structure
+        result = {
+            "score": 0,
+            "matches": [],
+            "decision": "ALLOW"
+        }
+
+        # Term-based checking
+        text_lower = text.lower()
+        for term in self.term_patterns:
+            matches = list(term['pattern'].finditer(text))
+            if matches:
+                term_result = {
+                    "type": "TERM",
+                    "category": term['category'],
+                    "matches": [m.group() for m in matches],
+                    "weight": term['weight']
+                }
+                result['matches'].append(term_result)
+                result['score'] += term['weight'] * len(matches)
+
+        # Model-based checking
+        if 'llama' in self.models and len(text) > 10:
+            inputs = self.models['llama']['tokenizer'](text, return_tensors="pt")
+            outputs = self.models['llama']['model'](**inputs)
+            prediction = outputs.logits.softmax(dim=1)[0]
+            if prediction[1] > self.config['model_settings']['llama_guard']['min_confidence']:
+                result['matches'].append({
+                    "type": "MODEL",
+                    "model": "llama_guard",
+                    "confidence": float(prediction[1]),
+                    "decision": "BLOCK"
+                })
+                result['score'] += float(prediction[1])
+
+        # Make decision
+        if result['score'] >= self.config['settings']['score_threshold']:
+            result['decision'] = "BLOCK"
+        
+        return result
+
+# Global engine instance
+engine = ModerationEngine()
+
+if __name__ == "__main__":
+    url = sys.argv[1]
+    method = sys.argv[3]
+    
+    try:
+        # Get request body if POST
+        request_body = ""
+        if method == "POST":
+            content_length = int(os.environ.get('CONTENT_LENGTH', 0))
+            if content_length > 0:
+                request_body = sys.stdin.read(content_length)
+        
+        # Create content to check (URL + body)
+        content_to_check = f"URL: {url}\nBODY: {request_body}"
+        
+        # Perform moderation
+        result = engine.check_content(content_to_check)
+        
+        # Log the result (structured logging)
+        engine._log(json.dumps({
+            "action": "moderation_decision",
+            "decision": result['decision'],
+            "score": result['score'],
+            "matches": result['matches'],
+            "sample": content_to_check[:100] + "..." if len(content_to_check) > 100 else content_to_check
+        }))
+        
+        # Return decision to Squid
+        print("OK" if result['decision'] == "BLOCK" else "ERR")
+        
+    except Exception as e:
+        engine._log(f"Processing error: {str(e)}", "ERROR")
+        print("ERR")  # Fail open by default
+
+
+-------------+++++++-------+++++++++++--------+++++++
+
+terms.yaml:-
+
+# Advanced YAML configuration
+version: 1.2
+
+settings:
+  refresh_interval: 300  # Reload config every 5 minutes
+  score_threshold: 0.85
+  allow_overrides: false
+
+term_sets:
+  - id: hate_speech
+    label: "Hate Speech Detection"
+    terms:
+      - pattern: "\b(racial|ethnic)\s(slur|epithet)\b"
+        weight: 1.0
+        context: required
+      - pattern: "\bhate\s(group|speech)\b"
+        weight: 0.9
+    exceptions:
+      - "historical analysis of hate groups"
+  
+  - id: violence
+    label: "Violent Content"
+    regex_patterns:
+      - "\b(kill|murder|attack)\b(?!.*prevent)"
+      - "\b(bomb|shoot|stab)\b.*(threat|plan)"
+    weight: 0.95
+
+model_settings:
+  llama_guard:
+    min_confidence: 0.75
+    max_response_time: 2.0
+  local_model:
+    model_path: "/models/fast-text"
+    threshold: 0.8
+
+
+-------------------------------+++++++++++------------
+
+
+
+
+
+import time
+import os
+
+TERMS_LAST_MODIFIED = 0
+
+def check_term_updates():
+    global TERMS_LAST_MODIFIED, term_patterns
+    try:
+        mod_time = os.path.getmtime('/etc/config/terms.yaml')
+        if mod_time > TERMS_LAST_MODIFIED:
+            with open('/etc/config/terms.yaml', 'r') as f:
+                config = yaml.safe_load(f)
+            term_patterns = load_terms()
+            TERMS_LAST_MODIFIED = mod_time
+            print("Reloaded terms configuration", file=sys.stderr)
+    except Exception as e:
+        print(f"Error reloading terms: {e}", file=sys.stderr)
+
+# Call this periodically in your moderation function
+
+
+
+++++++++------+++++++-------+++++++------
+
+
+
+
+
