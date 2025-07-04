@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Integrated UI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* [Previous CSS styles remain the same until .dashboard-cards] */
+        
+        /* GitHub Integration Styles */
+        .github-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+        }
+        
+        .github-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 1rem;
+        }
+        
+        .github-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .github-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .github-tab {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .github-tab.active {
+            border-bottom: 2px solid var(--primary);
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .github-tab:hover {
+            color: var(--primary);
+        }
+        
+        .github-content {
+            min-height: 300px;
+        }
+        
+        .repo-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        
+        .repo-card {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 1rem;
+            transition: all 0.2s ease;
+        }
+        
+        .repo-card:hover {
+            border-color: var(--secondary);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .repo-name {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .repo-desc {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        
+        .repo-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: #888;
+        }
+        
+        .repo-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        
+        .file-browser {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .file-header {
+            background: #f8f9fa;
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .file-list {
+            list-style: none;
+        }
+        
+        .file-item {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .file-icon {
+            color: #6a737d;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .commit-list {
+            list-style: none;
+        }
+        
+        .commit-item {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .commit-item:last-child {
+            border-bottom: none;
+        }
+        
+        .commit-message {
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+        
+        .commit-meta {
+            font-size: 0.8rem;
+            color: #888;
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .branch-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+        }
+        
+        .branch-dropdown {
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .git-actions {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #eee;
+        }
+        
+        .git-btn {
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        
+        .git-btn:hover {
+            background: var(--secondary);
+        }
+        
+        .git-btn.secondary {
+            background: white;
+            border: 1px solid #ddd;
+            color: var(--dark);
+        }
+        
+        .git-btn.secondary:hover {
+            border-color: var(--secondary);
+        }
+        
+        .terminal {
+            background: #1e1e1e;
+            color: #f0f0f0;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            height: 200px;
+            overflow-y: auto;
+        }
+        
+        .terminal-line {
+            margin-bottom: 0.5rem;
+        }
+        
+        .terminal-prompt {
+            color: #4CAF50;
+        }
+        
+        .terminal-command {
+            color: #9CDCFE;
+        }
+        
+        .terminal-output {
+            color: #CE9178;
+        }
+    </style>
+</head>
+<body>
+    <!-- [Previous HTML structure remains the same until the main content] -->
+    <!-- ... -->
+
+    <main class="main-content">
+        <div class="header">
+            <button class="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="user-profile">
+                <span>Developer</span>
+                <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="User" class="user-avatar">
+            </div>
+        </div>
+
+        <div class="github-container">
+            <div class="github-header">
+                <h2 class="github-title">
+                    <i class="fab fa-github"></i>
+                    GitHub Integration
+                </h2>
+                <div>
+                    <button class="git-btn" id="connectGithub">
+                        <i class="fas fa-plug"></i>
+                        Connect GitHub
+                    </button>
+                </div>
+            </div>
+            
+            <div class="github-tabs">
+                <div class="github-tab active" data-tab="repos">Repositories</div>
+                <div class="github-tab" data-tab="files">Files</div>
+                <div class="github-tab" data-tab="commits">Commits</div>
+                <div class="github-tab" data-tab="branches">Branches</div>
+                <div class="github-tab" data-tab="terminal">Git Terminal</div>
+            </div>
+            
+            <div class="github-content">
+                <!-- Repositories Tab -->
+                <div id="repos-tab" class="github-tab-content active">
+                    <div class="repo-list" id="repoList">
+                        <!-- Repositories will be loaded here -->
+                        <div class="repo-card">
+                            <div class="repo-name">
+                                <i class="fas fa-book"></i>
+                                example-repo
+                            </div>
+                            <div class="repo-desc">
+                                This is an example repository description
+                            </div>
+                            <div class="repo-meta">
+                                <span><i class="fas fa-code-branch"></i> main</span>
+                                <span><i class="fas fa-star"></i> 12</span>
+                                <span><i class="fas fa-code"></i> JavaScript</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Files Tab -->
+                <div id="files-tab" class="github-tab-content">
+                    <div class="branch-selector">
+                        <span>Branch:</span>
+                        <select class="branch-dropdown" id="branchSelect">
+                            <option>main</option>
+                            <option>develop</option>
+                            <option>feature/new-ui</option>
+                        </select>
+                    </div>
+                    <div class="file-browser">
+                        <div class="file-header">
+                            <i class="fas fa-folder-open"></i>
+                            /example-repo
+                        </div>
+                        <ul class="file-list" id="fileList">
+                            <li class="file-item">
+                                <span class="file-icon"><i class="fas fa-folder"></i></span>
+                                <span>src</span>
+                            </li>
+                            <li class="file-item">
+                                <span class="file-icon"><i class="fas fa-folder"></i></span>
+                                <span>public</span>
+                            </li>
+                            <li class="file-item">
+                                <span class="file-icon"><i class="fas fa-file-code"></i></span>
+                                <span>index.html</span>
+                            </li>
+                            <li class="file-item">
+                                <span class="file-icon"><i class="fas fa-file-code"></i></span>
+                                <span>styles.css</span>
+                            </li>
+                            <li class="file-item">
+                                <span class="file-icon"><i class="fas fa-file-alt"></i></span>
+                                <span>README.md</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Commits Tab -->
+                <div id="commits-tab" class="github-tab-content">
+                    <div class="branch-selector">
+                        <span>Branch:</span>
+                        <select class="branch-dropdown" id="commitBranchSelect">
+                            <option>main</option>
+                            <option>develop</option>
+                            <option>feature/new-ui</option>
+                        </select>
+                    </div>
+                    <ul class="commit-list" id="commitList">
+                        <li class="commit-item">
+                            <div class="commit-message">Implemented new UI design</div>
+                            <div class="commit-meta">
+                                <span>John Doe</span>
+                                <span>2 days ago</span>
+                                <span>a1b2c3d</span>
+                            </div>
+                        </li>
+                        <li class="commit-item">
+                            <div class="commit-message">Fixed responsive issues</div>
+                            <div class="commit-meta">
+                                <span>Jane Smith</span>
+                                <span>1 week ago</span>
+                                <span>e4f5g6h</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Branches Tab -->
+                <div id="branches-tab" class="github-tab-content">
+                    <div class="git-actions">
+                        <button class="git-btn" id="createBranchBtn">
+                            <i class="fas fa-plus"></i>
+                            Create Branch
+                        </button>
+                        <button class="git-btn secondary" id="mergeBranchBtn">
+                            <i class="fas fa-code-branch"></i>
+                            Merge Branch
+                        </button>
+                    </div>
+                    <ul class="file-list" id="branchList">
+                        <li class="file-item">
+                            <span class="file-icon"><i class="fas fa-code-branch"></i></span>
+                            <span>main</span>
+                            <span style="margin-left: auto; font-size: 0.8rem; color: #888;">Default branch</span>
+                        </li>
+                        <li class="file-item">
+                            <span class="file-icon"><i class="fas fa-code-branch"></i></span>
+                            <span>develop</span>
+                        </li>
+                        <li class="file-item">
+                            <span class="file-icon"><i class="fas fa-code-branch"></i></span>
+                            <span>feature/new-ui</span>
+                        </li>
+                        <li class="file-item">
+                            <span class="file-icon"><i class="fas fa-code-branch"></i></span>
+                            <span>bugfix/login</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Terminal Tab -->
+                <div id="terminal-tab" class="github-tab-content">
+                    <div class="terminal" id="gitTerminal">
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">$</span>
+                            <span class="terminal-command">git status</span>
+                        </div>
+                        <div class="terminal-line terminal-output">
+                            On branch main<br>
+                            Your branch is up to date with 'origin/main'.<br><br>
+                            nothing to commit, working tree clean
+                        </div>
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">$</span>
+                            <span class="terminal-command" contenteditable="true"></span>
+                        </div>
+                    </div>
+                    <div class="git-actions">
+                        <button class="git-btn" id="executeTerminalBtn">
+                            <i class="fas fa-play"></i>
+                            Execute
+                        </button>
+                        <button class="git-btn secondary" id="clearTerminalBtn">
+                            <i class="fas fa-trash"></i>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- [Rest of your existing HTML, including the chatbot] -->
+        <!-- ... -->
+    </main>
+
+    <script>
+        // [Previous JavaScript remains the same until the GitHub integration]
+        
+        // GitHub Integration Functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching
+            const tabs = document.querySelectorAll('.github-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and content
+                    document.querySelectorAll('.github-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.github-tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab and corresponding content
+                    tab.classList.add('active');
+                    const tabId = tab.getAttribute('data-tab') + '-tab';
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // Connect GitHub button
+            document.getElementById('connectGithub').addEventListener('click', function() {
+                // In a real app, this would initiate OAuth flow
+                alert('In a real application, this would connect to GitHub using OAuth. For this demo, we\'ll simulate connection.');
+                
+                // Simulate loading repositories
+                simulateLoadRepositories();
+            });
+            
+            // Create Branch button
+            document.getElementById('createBranchBtn').addEventListener('click', function() {
+                const branchName = prompt('Enter new branch name:');
+                if (branchName) {
+                    const branchList = document.getElementById('branchList');
+                    const newBranch = document.createElement('li');
+                    newBranch.className = 'file-item';
+                    newBranch.innerHTML = `
+                        <span class="file-icon"><i class="fas fa-code-branch"></i></span>
+                        <span>${branchName}</span>
+                    `;
+                    branchList.appendChild(newBranch);
+                    
+                    // Add to branch dropdowns
+                    addBranchToDropdowns(branchName);
+                }
+            });
+            
+            // Merge Branch button
+            document.getElementById('mergeBranchBtn').addEventListener('click', function() {
+                const branchSelect = document.getElementById('branchSelect');
+                const selectedBranch = branchSelect.value;
+                
+                if (selectedBranch === 'main') {
+                    alert('Cannot merge main into itself');
+                    return;
+                }
+                
+                if (confirm(`Merge ${selectedBranch} into main?`)) {
+                    alert(`Successfully merged ${selectedBranch} into main!`);
+                    // In a real app, this would make an API call to GitHub
+                }
+            });
+            
+            // Terminal functionality
+            document.getElementById('executeTerminalBtn').addEventListener('click', executeTerminalCommand);
+            document.getElementById('clearTerminalBtn').addEventListener('click', clearTerminal);
+            
+            // Allow pressing Enter in terminal
+            document.querySelector('#gitTerminal .terminal-command').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    executeTerminalCommand();
+                }
+            });
+            
+            // Helper functions
+            function simulateLoadRepositories() {
+                const repoList = document.getElementById('repoList');
+                repoList.innerHTML = '';
+                
+                // Simulated repositories
+                const repos = [
+                    {
+                        name: 'awesome-project',
+                        description: 'My awesome project with all the cool features',
+                        branch: 'main',
+                        stars: 24,
+                        language: 'JavaScript'
+                    },
+                    {
+                        name: 'website-redesign',
+                        description: 'Complete redesign of company website',
+                        branch: 'develop',
+                        stars: 8,
+                        language: 'TypeScript'
+                    },
+                    {
+                        name: 'api-service',
+                        description: 'Backend API service for mobile apps',
+                        branch: 'main',
+                        stars: 15,
+                        language: 'Python'
+                    }
+                ];
+                
+                repos.forEach(repo => {
+                    const repoCard = document.createElement('div');
+                    repoCard.className = 'repo-card';
+                    repoCard.innerHTML = `
+                        <div class="repo-name">
+                            <i class="fas fa-book"></i>
+                            ${repo.name}
+                        </div>
+                        <div class="repo-desc">${repo.description}</div>
+                        <div class="repo-meta">
+                            <span><i class="fas fa-code-branch"></i> ${repo.branch}</span>
+                            <span><i class="fas fa-star"></i> ${repo.stars}</span>
+                            <span><i class="fas fa-code"></i> ${repo.language}</span>
+                        </div>
+                    `;
+                    repoList.appendChild(repoCard);
+                });
+            }
+            
+            function addBranchToDropdowns(branchName) {
+                const dropdowns = document.querySelectorAll('.branch-dropdown');
+                dropdowns.forEach(dropdown => {
+                    const option = document.createElement('option');
+                    option.textContent = branchName;
+                    dropdown.appendChild(option);
+                });
+            }
+            
+            function executeTerminalCommand() {
+                const terminal = document.getElementById('gitTerminal');
+                const commandElement = terminal.querySelector('.terminal-command:last-child');
+                const command = commandElement.textContent.trim();
+                
+                if (!command) return;
+                
+                // Add the output
+                let output = '';
+                if (command.startsWith('git ')) {
+                    const gitCommand = command.substring(4);
+                    switch (gitCommand) {
+                        case 'status':
+                            output = `On branch main\nYour branch is up to date with 'origin/main'.\n\nnothing to commit, working tree clean`;
+                            break;
+                        case 'branch':
+                            output = `* main\n  develop\n  feature/new-ui`;
+                            break;
+                        case 'pull':
+                            output = `Already up to date.`;
+                            break;
+                        default:
+                            output = `Command '${command}' executed successfully.`;
+                    }
+                } else {
+                    output = `Error: '${command}' is not a git command`;
+                }
+                
+                const outputElement = document.createElement('div');
+                outputElement.className = 'terminal-line terminal-output';
+                outputElement.textContent = output;
+                
+                // Create new prompt line
+                const newPrompt = document.createElement('div');
+                newPrompt.className = 'terminal-line';
+                newPrompt.innerHTML = `
+                    <span class="terminal-prompt">$</span>
+                    <span class="terminal-command" contenteditable="true"></span>
+                `;
+                
+                // Replace the current command line with output and new prompt
+                commandElement.parentElement.remove();
+                terminal.appendChild(outputElement);
+                terminal.appendChild(newPrompt);
+                
+                // Focus on the new command line
+                newPrompt.querySelector('.terminal-command').focus();
+                
+                // Scroll to bottom
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+            
+            function clearTerminal() {
+                const terminal = document.getElementById('gitTerminal');
+                terminal.innerHTML = `
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">$</span>
+                        <span class="terminal-command" contenteditable="true"></span>
+                    </div>
+                `;
+                terminal.querySelector('.terminal-command').focus();
+            }
+            
+            // Initialize with some sample data
+            simulateLoadRepositories();
+        });
+        
+        // [Rest of your existing JavaScript]
+    </script>
+</body>
+</html>
